@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using Unity.Mathematics;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.InputSystem;
@@ -11,8 +12,12 @@ public class PlayerController : MonoBehaviour
     public GameObject target1;
     public Vector3 screenPosition;
     public Vector3 worldPosition;
+    public GameObject pickaxe;
     static float agentDrift = 0.0001f; // minimal
     public bool destinating;
+    public Vector2 movement;
+    public float speed;
+    public Rigidbody2D rb;
     void SetDestination(GameObject target)
     {
         target1.SetActive(true);
@@ -27,37 +32,77 @@ public class PlayerController : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        agent=this.GetComponent<NavMeshAgent>();
+        rb=GetComponent<Rigidbody2D>();
+        agent=GetComponent<NavMeshAgent>();
     }
 
     // Update is called once per frame
     void Update()
     {
-        if(Vector2.Distance(transform.position,worldPosition)<agent.stoppingDistance){
-            target1.SetActive(false);
-            destinating=false;
-        }
+        screenPosition=Mouse.current.position.ReadValue();
+        screenPosition.z=Camera.main.nearClipPlane;
+        worldPosition=Camera.main.ScreenToWorldPoint(screenPosition);
         if(destinating){
-            screenPosition=Mouse.current.position.ReadValue();
-            screenPosition.z=Camera.main.nearClipPlane+1;
-            worldPosition=Camera.main.ScreenToWorldPoint(screenPosition);
             target1.transform.position=worldPosition;
             SetDestination(target1);
         }
-        
+        if(Vector2.Distance(transform.position,target1.transform.position)<agent.stoppingDistance){
+            target1.SetActive(false);
+            agent.isStopped=true;
+            destinating=false;
+        }
+        if(Vector2.Distance(worldPosition,transform.position)>0.1){
+            Vector2 worldvector2=worldPosition;
+            Vector2 posvector2=transform.position;
+            transform.up =  posvector2-worldvector2;
+        }
     }
-    public void OnClick(InputAction.CallbackContext context)
+    void FixedUpdate(){
+        if(movement.normalized==Vector2.up||movement.normalized==Vector2.down){
+            movement.x+=0.001f;
+        }
+        rb.AddForce(movement*speed);
+    }
+    public void OnRightClick(InputAction.CallbackContext context)
     {
         if(context.ReadValueAsButton()){
             destinating=true;
-            screenPosition=Mouse.current.position.ReadValue();
-            screenPosition.z=Camera.main.nearClipPlane+1;
-            worldPosition=Camera.main.ScreenToWorldPoint(screenPosition);
-            target1.transform.position=worldPosition;
+            agent.isStopped=false;
         }
         else{
             destinating=false;
         }
-        
+    }
+    public void OnClick(InputAction.CallbackContext context)
+    {
+        if(context.ReadValueAsButton()){
+            target1.SetActive(false);
+            agent.isStopped=true;
+            destinating=false;
+            pickaxe.SetActive(true);
+            pickaxe.GetComponent<PickaxeController>().Swing();
+            pickaxe.GetComponent<PickaxeController>().Swinging=true;
+        }
+        else{
+            pickaxe.GetComponent<PickaxeController>().Swinging=false;
+        }
+    }
+    public void OnMove(InputAction.CallbackContext context)
+    {
+        movement=context.ReadValue<Vector2>();
+        if(movement.magnitude>0.1){
+            
+            target1.SetActive(false);
+            agent.isStopped=true;
+            destinating=false;
+        }
+        else{
+            movement=Vector2.zero;
+        }
+    }
+    public void SwingAgain(){
+        pickaxe.SetActive(false);
+        pickaxe.SetActive(true);
+        pickaxe.GetComponent<PickaxeController>().Swing();
     }
 }
